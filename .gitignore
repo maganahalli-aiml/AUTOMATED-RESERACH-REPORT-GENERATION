@@ -8,3 +8,10 @@ wheels/
 
 # Virtual environments
 .venv
+
+# .env file
+.env
+
+# Logs files  and directory
+logs/*
+notebook/logs/*
