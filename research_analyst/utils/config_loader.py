@@ -2,12 +2,13 @@
 from pathlib import Path
 import os
 import yaml
+from typing import Optional, Union
 
 def _project_root() -> Path:
     # .../utils/config_loader.py -> parents[1] == project root
     return Path(__file__).resolve().parents[1]
 
-def load_config(config_path: str | None = None) -> dict:
+def load_config(config_path: Optional[str] = None) -> dict:
     """
     Resolve config path reliably irrespective of CWD.
     Priority: explicit arg > CONFIG_PATH env > <project_root>/config/config.yaml

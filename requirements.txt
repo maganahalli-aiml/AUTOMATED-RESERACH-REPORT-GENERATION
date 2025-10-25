@@ -6,3 +6,5 @@ wikipedia
 langchain_openai
 langchain-google-genai
 langchain_groq
+python-docx
+reportlab

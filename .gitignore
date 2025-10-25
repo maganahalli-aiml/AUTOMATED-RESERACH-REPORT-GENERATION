@@ -15,3 +15,7 @@ wheels/
 # Logs files  and directory
 logs/*
 notebook/logs/*
+# OS generated files
+.DS_Store
+
+generated_reports/
