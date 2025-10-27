@@ -2,7 +2,7 @@ import sys
 import traceback
 from typing import Optional, cast
 
-class ProductAssistantException(Exception):
+class ResearchAnalystException(Exception):
     def __init__(self, error_message, error_details: Optional[object] = None):
         # Normalize message
         if isinstance(error_message, BaseException):
@@ -48,7 +48,7 @@ class ProductAssistantException(Exception):
         return base
 
     def __repr__(self):
-        return f"DocumentPortalException(file={self.file_name!r}, line={self.lineno}, message={self.error_message!r})"
+        return f"ResearchAnalystException(file={self.file_name!r}, line={self.lineno}, message={self.error_message!r})"
 
 
 # if __name__ == "__main__":
@@ -56,10 +56,10 @@ class ProductAssistantException(Exception):
 #     try:
 #         a = 1 / 0
 #     except Exception as e:
-#         raise DocumentPortalException("Division failed", e) from e
+#         raise ResearchAnalystException("Division failed", e) from e
 
 #     # Demo-2: still supports sys (old pattern)
 #     # try:
 #     #     a = int("abc")
 #     # except Exception as e:
-#     #     raise DocumentPortalException(e, sys)
+#     #     raise ResearchAnalystException(e, sys)

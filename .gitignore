@@ -19,3 +19,7 @@ notebook/logs/*
 .DS_Store
 
 generated_reports/
+generated_reports/*
+generated_report/
+
+autmated-research-report-generation
