@@ -25,7 +25,7 @@ from research_analyst.backend_server.models import (
 )
 
 from research_analyst.utils.model_loader import ModelLoader
-from research_analyst.prompt_library.prompts import *
+from research_analyst.prompt_library.prompt_locator import *
 
 def build_interview_graph(llm,tavily_search=None):
     
