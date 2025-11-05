@@ -28,10 +28,23 @@ if az containerapp env show --name $ENV_NAME --resource-group $RESOURCE_GROUP > 
         
         # Create new environment
         echo "🆕 Creating new Container Apps environment..."
-        az containerapp env create \
-          --name $ENV_NAME \
-          --resource-group $RESOURCE_GROUP \
-          --location $LOCATION
+        
+        # Get existing Log Analytics workspace
+        WORKSPACE_ID=$(az monitor log-analytics workspace list --resource-group $RESOURCE_GROUP --query "[0].id" -o tsv)
+        if [ -z "$WORKSPACE_ID" ]; then
+            echo "Creating Container Apps environment without specifying workspace (will create default)..."
+            az containerapp env create \
+              --name $ENV_NAME \
+              --resource-group $RESOURCE_GROUP \
+              --location $LOCATION
+        else
+            echo "Using existing Log Analytics workspace: $WORKSPACE_ID"
+            az containerapp env create \
+              --name $ENV_NAME \
+              --resource-group $RESOURCE_GROUP \
+              --location $LOCATION \
+              --logs-workspace-id $WORKSPACE_ID
+        fi
         
         # Wait for creation to complete
         echo "⏳ Waiting for environment to be ready..."
@@ -53,10 +66,22 @@ else
     echo "❌ Environment '$ENV_NAME' does not exist"
     echo "🆕 Creating Container Apps environment..."
     
-    az containerapp env create \
-      --name $ENV_NAME \
-      --resource-group $RESOURCE_GROUP \
-      --location $LOCATION
+    # Get existing Log Analytics workspace
+    WORKSPACE_ID=$(az monitor log-analytics workspace list --resource-group $RESOURCE_GROUP --query "[0].id" -o tsv)
+    if [ -z "$WORKSPACE_ID" ]; then
+        echo "Creating Container Apps environment without specifying workspace (will create default)..."
+        az containerapp env create \
+          --name $ENV_NAME \
+          --resource-group $RESOURCE_GROUP \
+          --location $LOCATION
+    else
+        echo "Using existing Log Analytics workspace: $WORKSPACE_ID"
+        az containerapp env create \
+          --name $ENV_NAME \
+          --resource-group $RESOURCE_GROUP \
+          --location $LOCATION \
+          --logs-workspace-id $WORKSPACE_ID
+    fi
     
     # Wait for creation to complete
     echo "⏳ Waiting for environment to be ready..."
