@@ -86,6 +86,8 @@ pipeline {
                       --tenant $AZURE_TENANT_ID
 
                     az account set --subscription $AZURE_SUBSCRIPTION_ID
+                    
+                    echo "Azure login successful. Subscription: $(az account show --query name -o tsv)"
                 '''
             }
         }
@@ -96,8 +98,7 @@ pipeline {
                 sh '''
                     echo "ACR Name: $ACR_NAME"
                     echo "Image Name: $IMAGE_NAME"
-                    echo "Logging into ACR..."
-                    az acr login --name $ACR_NAME
+                    echo "Note: Using Azure CLI without Docker daemon for ACR queries"
                     
                     echo "Checking if repository exists..."
                     if az acr repository list --name $ACR_NAME --query "[?contains(@, '$IMAGE_NAME')]" --output tsv | grep -q "$IMAGE_NAME"; then
