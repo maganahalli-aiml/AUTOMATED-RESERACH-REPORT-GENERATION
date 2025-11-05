@@ -98,23 +98,34 @@ pipeline {
                 sh '''
                     echo "ACR Name: $ACR_NAME"
                     echo "Image Name: $IMAGE_NAME"
-                    echo "Note: Using Azure CLI without Docker daemon for ACR queries"
+                    echo "Using ACR admin credentials for authentication"
+                    
+                    # Use admin credentials for ACR access in Jenkins
+                    export ACR_USERNAME_VALUE=$(echo $ACR_USERNAME)
+                    export ACR_PASSWORD_VALUE=$(echo $ACR_PASSWORD)
                     
                     echo "Checking if repository exists..."
-                    if az acr repository list --name $ACR_NAME --query "[?contains(@, '$IMAGE_NAME')]" --output tsv | grep -q "$IMAGE_NAME"; then
+                    az acr repository list --name $ACR_NAME --username $ACR_USERNAME_VALUE --password $ACR_PASSWORD_VALUE --query "[?contains(@, '$IMAGE_NAME')]" --output tsv > /tmp/repo_check.txt
+                    
+                    if grep -q "$IMAGE_NAME" /tmp/repo_check.txt; then
                         echo "Repository $IMAGE_NAME exists in ACR"
                     else
                         echo "Repository $IMAGE_NAME does not exist in ACR"
-                        az acr repository list --name $ACR_NAME --output table
+                        echo "Available repositories:"
+                        az acr repository list --name $ACR_NAME --username $ACR_USERNAME_VALUE --password $ACR_PASSWORD_VALUE --output table
                         exit 1
                     fi
                 '''
                 script {
                     def imageTag = sh(
                         script: """
+                            export ACR_USERNAME_VALUE=\$(echo \$ACR_USERNAME)
+                            export ACR_PASSWORD_VALUE=\$(echo \$ACR_PASSWORD)
                             az acr repository show-tags \
                               --name \$ACR_NAME \
                               --repository \$IMAGE_NAME \
+                              --username \$ACR_USERNAME_VALUE \
+                              --password \$ACR_PASSWORD_VALUE \
                               --orderby time_desc \
                               --output tsv | head -n 1
                         """,
@@ -127,17 +138,23 @@ pipeline {
                     } else {
                         echo "No tags found for repository ${env.IMAGE_NAME}"
                         sh """
+                            export ACR_USERNAME_VALUE=\$(echo \$ACR_USERNAME)
+                            export ACR_PASSWORD_VALUE=\$(echo \$ACR_PASSWORD)
                             echo "Listing all repositories in ACR:"
-                            az acr repository list --name \$ACR_NAME --output table
+                            az acr repository list --name \$ACR_NAME --username \$ACR_USERNAME_VALUE --password \$ACR_PASSWORD_VALUE --output table
                         """
                         error "No images found in ACR. Please run: ./build-and-push-docker-image.sh"
                     }
 
                     sh """
+                        export ACR_USERNAME_VALUE=\$(echo \$ACR_USERNAME)
+                        export ACR_PASSWORD_VALUE=\$(echo \$ACR_PASSWORD)
                         echo "Available tags:"
                         az acr repository show-tags \
                           --name \$ACR_NAME \
                           --repository \$IMAGE_NAME \
+                          --username \$ACR_USERNAME_VALUE \
+                          --password \$ACR_PASSWORD_VALUE \
                           --output table
                     """
                 }
