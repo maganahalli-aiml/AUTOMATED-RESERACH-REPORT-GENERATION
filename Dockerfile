@@ -15,7 +15,7 @@ COPY pyproject.toml .
 COPY README.md .
 # Create package directory structure for editable install
 RUN mkdir -p research_analyst
-COPY research_analyst/__init__.py research_and_analyst/
+COPY research_analyst/__init__.py research_analyst/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --user -r requirements.txt
