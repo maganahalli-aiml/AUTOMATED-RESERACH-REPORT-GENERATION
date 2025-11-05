@@ -100,63 +100,66 @@ pipeline {
                     echo "Image Name: $IMAGE_NAME"
                     echo "Using ACR admin credentials for authentication"
                     
-                    # Use admin credentials for ACR access in Jenkins
-                    export ACR_USERNAME_VALUE=$(echo $ACR_USERNAME)
-                    export ACR_PASSWORD_VALUE=$(echo $ACR_PASSWORD)
-                    
-                    echo "Checking if repository exists..."
-                    az acr repository list --name $ACR_NAME --username $ACR_USERNAME_VALUE --password $ACR_PASSWORD_VALUE --query "[?contains(@, '$IMAGE_NAME')]" --output tsv > /tmp/repo_check.txt
-                    
-                    if grep -q "$IMAGE_NAME" /tmp/repo_check.txt; then
-                        echo "Repository $IMAGE_NAME exists in ACR"
+                    # Test ACR connectivity first
+                    echo "Testing ACR connectivity..."
+                    if az acr show --name $ACR_NAME --query name -o tsv > /dev/null 2>&1; then
+                        echo "✅ ACR exists and is accessible"
                     else
-                        echo "Repository $IMAGE_NAME does not exist in ACR"
-                        echo "Available repositories:"
-                        az acr repository list --name $ACR_NAME --username $ACR_USERNAME_VALUE --password $ACR_PASSWORD_VALUE --output table
+                        echo "❌ Cannot access ACR"
                         exit 1
                     fi
+                    
+                    # Use direct admin authentication for repository operations
+                    echo "Checking repository with admin credentials..."
                 '''
                 script {
+                    // Use admin credentials directly for repository queries
                     def imageTag = sh(
-                        script: """
-                            export ACR_USERNAME_VALUE=\$(echo \$ACR_USERNAME)
-                            export ACR_PASSWORD_VALUE=\$(echo \$ACR_PASSWORD)
-                            az acr repository show-tags \
-                              --name \$ACR_NAME \
-                              --repository \$IMAGE_NAME \
-                              --username \$ACR_USERNAME_VALUE \
-                              --password \$ACR_PASSWORD_VALUE \
-                              --orderby time_desc \
-                              --output tsv | head -n 1
-                        """,
+                        script: '''
+                            # Get ACR login server
+                            ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --query loginServer -o tsv)
+                            
+                            # Use docker command with admin credentials to list tags
+                            echo "Listing tags using admin credentials..."
+                            
+                            # Alternative approach: use REST API with admin credentials
+                            LATEST_TAG=$(curl -s -u "${ACR_USERNAME}:${ACR_PASSWORD}" \
+                                "https://${ACR_LOGIN_SERVER}/v2/${IMAGE_NAME}/tags/list" | \
+                                python3 -c "import json,sys; data=json.load(sys.stdin); print(data['tags'][-1] if 'tags' in data and data['tags'] else 'none')")
+                            
+                            if [ "$LATEST_TAG" != "none" ] && [ ! -z "$LATEST_TAG" ]; then
+                                echo "$LATEST_TAG"
+                            else
+                                # Fallback to CLI with admin credentials
+                                az acr repository show-tags \
+                                  --name $ACR_NAME \
+                                  --repository $IMAGE_NAME \
+                                  --username "$ACR_USERNAME" \
+                                  --password "$ACR_PASSWORD" \
+                                  --orderby time_desc \
+                                  --output tsv | head -n 1 || echo "none"
+                            fi
+                        ''',
                         returnStdout: true
                     ).trim()
 
-                    if (imageTag) {
+                    if (imageTag && imageTag != "none") {
                         echo "Found image with tag: ${imageTag}"
                         env.IMAGE_TAG = imageTag
                     } else {
                         echo "No tags found for repository ${env.IMAGE_NAME}"
-                        sh """
-                            export ACR_USERNAME_VALUE=\$(echo \$ACR_USERNAME)
-                            export ACR_PASSWORD_VALUE=\$(echo \$ACR_PASSWORD)
-                            echo "Listing all repositories in ACR:"
-                            az acr repository list --name \$ACR_NAME --username \$ACR_USERNAME_VALUE --password \$ACR_PASSWORD_VALUE --output table
-                        """
+                        sh '''
+                            echo "Checking if repository exists..."
+                            curl -s -u "${ACR_USERNAME}:${ACR_PASSWORD}" \
+                                "https://${ACR_NAME}.azurecr.io/v2/_catalog" | \
+                                python3 -c "import json,sys; data=json.load(sys.stdin); print('Available repositories:', data.get('repositories', []))"
+                        '''
                         error "No images found in ACR. Please run: ./build-and-push-docker-image.sh"
                     }
 
-                    sh """
-                        export ACR_USERNAME_VALUE=\$(echo \$ACR_USERNAME)
-                        export ACR_PASSWORD_VALUE=\$(echo \$ACR_PASSWORD)
-                        echo "Available tags:"
-                        az acr repository show-tags \
-                          --name \$ACR_NAME \
-                          --repository \$IMAGE_NAME \
-                          --username \$ACR_USERNAME_VALUE \
-                          --password \$ACR_PASSWORD_VALUE \
-                          --output table
-                    """
+                    sh '''
+                        echo "✅ Successfully verified image: ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+                    '''
                 }
             }
         }
