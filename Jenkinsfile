@@ -166,6 +166,10 @@ pipeline {
                 echo 'Deploying to Azure Container Apps...'
                 sh '''
                     echo "Using image: ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+                    
+                    # Run environment verification script
+                    echo "Running Container Apps environment verification..."
+                    ./fix-container-apps-env.sh
 
                     # Check if Container App exists
                     if az containerapp show \
