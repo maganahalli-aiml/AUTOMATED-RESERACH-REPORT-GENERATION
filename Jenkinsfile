@@ -93,6 +93,21 @@ pipeline {
         stage('Verify Docker Image in ACR') {
             steps {
                 echo 'Verifying Docker image exists in ACR...'
+                sh '''
+                    echo "ACR Name: $ACR_NAME"
+                    echo "Image Name: $IMAGE_NAME"
+                    echo "Logging into ACR..."
+                    az acr login --name $ACR_NAME
+                    
+                    echo "Checking if repository exists..."
+                    if az acr repository list --name $ACR_NAME --query "[?contains(@, '$IMAGE_NAME')]" --output tsv | grep -q "$IMAGE_NAME"; then
+                        echo "Repository $IMAGE_NAME exists in ACR"
+                    else
+                        echo "Repository $IMAGE_NAME does not exist in ACR"
+                        az acr repository list --name $ACR_NAME --output table
+                        exit 1
+                    fi
+                '''
                 script {
                     def imageTag = sh(
                         script: """
@@ -109,6 +124,11 @@ pipeline {
                         echo "Found image with tag: ${imageTag}"
                         env.IMAGE_TAG = imageTag
                     } else {
+                        echo "No tags found for repository ${env.IMAGE_NAME}"
+                        sh """
+                            echo "Listing all repositories in ACR:"
+                            az acr repository list --name \$ACR_NAME --output table
+                        """
                         error "No images found in ACR. Please run: ./build-and-push-docker-image.sh"
                     }
 
