@@ -38,8 +38,18 @@ echo "1️⃣  Stopping Container Apps..."
 CONTAINER_APPS=$(az containerapp list --resource-group $APP_RG --query "[].name" -o tsv 2>/dev/null || echo "")
 if [ ! -z "$CONTAINER_APPS" ]; then
     for app in $CONTAINER_APPS; do
-        echo "   🛑 Stopping Container App: $app"
-        az containerapp update --name $app --resource-group $APP_RG --min-replicas 0 --max-replicas 0 || echo "   ⚠️  Failed to stop $app"
+        echo "   🛑 Scaling down Container App: $app"
+        # Method 1: Scale to minimum replicas (will scale to 0 when no traffic)
+        az containerapp update --name $app --resource-group $APP_RG --min-replicas 0 --max-replicas 1 2>/dev/null || echo "   ⚠️  Scaling method 1 failed for $app"
+        
+        # Method 2: Also try to deactivate the revision to ensure it's truly stopped
+        echo "   💤 Attempting to deactivate $app..."
+        REVISION=$(az containerapp revision list --name $app --resource-group $APP_RG --query "[0].name" -o tsv 2>/dev/null || echo "")
+        if [ ! -z "$REVISION" ]; then
+            az containerapp revision deactivate --name $app --resource-group $APP_RG --revision $REVISION 2>/dev/null || echo "   ℹ️  Deactivation not needed or failed for $app"
+        fi
+        
+        echo "   ✅ Container App $app configured for minimal cost"
     done
 else
     echo "   ℹ️  No Container Apps found"
@@ -103,7 +113,7 @@ az resource list --resource-group $APP_RG --query "[].{Name:name, Type:type, Loc
 # 6. Cost estimation
 echo ""
 echo "6️⃣  Cost Impact Summary:"
-echo "   ✅ Container Apps: Scaled to 0 replicas (minimal cost)"
+echo "   ✅ Container Apps: Scaled to 0 min replicas (minimal cost, scales to 0 with no traffic)"
 echo "   ✅ Container Instances: Stopped (no compute cost)"
 echo "   ✅ Virtual Machines: Deallocated (no compute cost)"
 echo "   💰 Still incurring minimal costs for:"
@@ -115,9 +125,9 @@ echo "      - Resource groups (free)"
 echo ""
 echo "🎯 Cost Optimization Tips:"
 echo "   💡 To completely eliminate costs, delete entire resource groups"
-echo "   💡 Storage costs are minimal (~$0.02-0.05/month)"
-echo "   💡 Container Registry basic tier (~$5/month)"
-echo "   💡 Log Analytics minimal usage (~$0.10-0.50/month)"
+echo "   💡 Storage costs are minimal (~\$0.02-0.05/month)"
+echo "   💡 Container Registry basic tier (~\$5/month)"
+echo "   💡 Log Analytics minimal usage (~\$0.10-0.50/month)"
 
 echo ""
 echo "✅ Service shutdown complete!"
