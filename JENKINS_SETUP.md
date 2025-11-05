@@ -100,6 +100,7 @@ az containerapp show --name research-report-app --resource-group research-report
 
 ## 🚨 Troubleshooting
 ## Makesure No sensitive information mentioned here
+## Fixed the Key value for  APi Keys
 
 1. **Pipeline fails with authentication errors**: Verify Service Principal credentials in Jenkins
 2. **Image not found in ACR**: Run `./build-and-push-docker-image.sh` first
