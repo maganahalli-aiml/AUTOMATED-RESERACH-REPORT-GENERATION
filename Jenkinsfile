@@ -95,70 +95,40 @@ pipeline {
         stage('Verify Docker Image in ACR') {
             steps {
                 echo 'Verifying Docker image exists in ACR...'
-                sh '''
-                    echo "ACR Name: $ACR_NAME"
-                    echo "Image Name: $IMAGE_NAME"
-                    echo "Using ACR admin credentials for authentication"
-                    
-                    # Test ACR connectivity first
-                    echo "Testing ACR connectivity..."
-                    if az acr show --name $ACR_NAME --query name -o tsv > /dev/null 2>&1; then
-                        echo "✅ ACR exists and is accessible"
-                    else
-                        echo "❌ Cannot access ACR"
-                        exit 1
-                    fi
-                    
-                    # Use direct admin authentication for repository operations
-                    echo "Checking repository with admin credentials..."
-                '''
                 script {
-                    // Use admin credentials directly for repository queries
+                    // Use a simple, clean approach to get the latest tag
                     def imageTag = sh(
                         script: '''
-                            # Get ACR login server
-                            ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --query loginServer -o tsv)
+                            # Method 1: Try Azure CLI (simple and reliable)
+                            TAG=$(az acr repository show-tags \
+                              --name $ACR_NAME \
+                              --repository $IMAGE_NAME \
+                              --orderby time_desc \
+                              --output tsv 2>/dev/null | head -n 1)
                             
-                            # Use docker command with admin credentials to list tags
-                            echo "Listing tags using admin credentials..."
-                            
-                            # Alternative approach: use REST API with admin credentials
-                            LATEST_TAG=$(curl -s -u "${ACR_USERNAME}:${ACR_PASSWORD}" \
-                                "https://${ACR_LOGIN_SERVER}/v2/${IMAGE_NAME}/tags/list" | \
-                                python3 -c "import json,sys; data=json.load(sys.stdin); print(data['tags'][-1] if 'tags' in data and data['tags'] else 'none')")
-                            
-                            if [ "$LATEST_TAG" != "none" ] && [ ! -z "$LATEST_TAG" ]; then
-                                echo "$LATEST_TAG"
+                            if [ ! -z "$TAG" ]; then
+                                echo "$TAG"
                             else
-                                # Fallback to CLI with admin credentials
-                                az acr repository show-tags \
-                                  --name $ACR_NAME \
-                                  --repository $IMAGE_NAME \
-                                  --username "$ACR_USERNAME" \
-                                  --password "$ACR_PASSWORD" \
-                                  --orderby time_desc \
-                                  --output tsv | head -n 1 || echo "none"
+                                echo "none"
                             fi
                         ''',
                         returnStdout: true
                     ).trim()
 
                     if (imageTag && imageTag != "none") {
-                        echo "Found image with tag: ${imageTag}"
+                        echo "✅ Found image with tag: ${imageTag}"
                         env.IMAGE_TAG = imageTag
                     } else {
-                        echo "No tags found for repository ${env.IMAGE_NAME}"
+                        echo "❌ No images found in ACR repository: ${env.IMAGE_NAME}"
                         sh '''
-                            echo "Checking if repository exists..."
-                            curl -s -u "${ACR_USERNAME}:${ACR_PASSWORD}" \
-                                "https://${ACR_NAME}.azurecr.io/v2/_catalog" | \
-                                python3 -c "import json,sys; data=json.load(sys.stdin); print('Available repositories:', data.get('repositories', []))"
+                            echo "Available repositories in ACR:"
+                            az acr repository list --name $ACR_NAME --output table 2>/dev/null || echo "Cannot list repositories"
                         '''
                         error "No images found in ACR. Please run: ./build-and-push-docker-image.sh"
                     }
 
                     sh '''
-                        echo "✅ Successfully verified image: ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+                        echo "✅ Using image: ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
                     '''
                 }
             }
