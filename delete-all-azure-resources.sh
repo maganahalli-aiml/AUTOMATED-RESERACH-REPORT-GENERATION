@@ -86,26 +86,45 @@ echo "   ⏳ This may take 5-10 minutes to complete..."
 
 JENKINS_EXISTS=true
 APP_EXISTS=true
+MAX_WAIT_TIME=1800  # 30 minutes maximum wait
+ELAPSED_TIME=0
+CHECK_INTERVAL=30
 
 while [ "$JENKINS_EXISTS" = true ] || [ "$APP_EXISTS" = true ]; do
-    sleep 30
+    # Check if we've exceeded maximum wait time
+    if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME ]; then
+        echo "   ⚠️  Timeout reached (30 minutes). Exiting monitoring loop."
+        echo "   💡 Check Azure Portal to verify deletion status"
+        break
+    fi
     
-    if az group exists --name $JENKINS_RG 2>/dev/null; then
-        echo "   🔄 Jenkins resources still deleting..."
-    else
-        if [ "$JENKINS_EXISTS" = true ]; then
+    sleep $CHECK_INTERVAL
+    ELAPSED_TIME=$((ELAPSED_TIME + CHECK_INTERVAL))
+    
+    # Check Jenkins resource group with timeout protection
+    if [ "$JENKINS_EXISTS" = true ]; then
+        if timeout 60 az group exists --name $JENKINS_RG 2>/dev/null; then
+            echo "   🔄 Jenkins resources still deleting... (${ELAPSED_TIME}s elapsed)"
+        else
             echo "   ✅ Jenkins resources deleted"
             JENKINS_EXISTS=false
         fi
     fi
     
-    if az group exists --name $APP_RG 2>/dev/null; then
-        echo "   🔄 App resources still deleting..."
-    else
-        if [ "$APP_EXISTS" = true ]; then
+    # Check App resource group with timeout protection
+    if [ "$APP_EXISTS" = true ]; then
+        if timeout 60 az group exists --name $APP_RG 2>/dev/null; then
+            echo "   🔄 App resources still deleting... (${ELAPSED_TIME}s elapsed)"
+        else
             echo "   ✅ App resources deleted"
             APP_EXISTS=false
         fi
+    fi
+    
+    # Progress indicator
+    MINUTES=$((ELAPSED_TIME / 60))
+    if [ $((ELAPSED_TIME % 300)) -eq 0 ] && [ $ELAPSED_TIME -gt 0 ]; then
+        echo "   ⏰ ${MINUTES} minutes elapsed... still monitoring deletion"
     fi
 done
 
