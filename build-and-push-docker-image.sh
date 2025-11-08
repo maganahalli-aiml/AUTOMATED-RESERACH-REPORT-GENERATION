@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-ACR_NAME="researchreportacr2287129"
+ACR_NAME="researchreportacr2580117"
 IMAGE_NAME="research-report-app"
 TAG="latest"
 
